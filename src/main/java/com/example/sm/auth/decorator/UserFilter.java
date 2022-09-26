@@ -1,5 +1,6 @@
 package com.example.sm.auth.decorator;
 
+import com.example.sm.common.enums.Role;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,17 +10,21 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Data
 public class UserFilter {
-    //TODO RENAME Search To search
-    String Search;
+    String search;
+    Role role;
     String Id;
+
 
     @JsonIgnore
     boolean softDelete = false;
 
     public String getSearch(){
-        if(Search !=null){
-            return Search.trim();
+        if(search !=null){
+            return search.trim();
         }
-        return Search;
+        return search;
+    }
+    public Role getRole(){
+        return role;
     }
 }

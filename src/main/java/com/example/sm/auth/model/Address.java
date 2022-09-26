@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 public class Address {
-   String address1;
+   String address;
    String address2;
    String address3;
    String city;

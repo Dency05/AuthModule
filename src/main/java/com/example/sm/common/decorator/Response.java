@@ -1,5 +1,6 @@
 package com.example.sm.common.decorator;
 
+import com.example.sm.common.constant.MessageConstant;
 import com.example.sm.common.constant.ResponseConstant;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,13 @@ public class Response {
     public static Response getNotFoundResponse(String msg) {
         return new Response(HttpStatus.BAD_REQUEST,ResponseConstant.OK, msg);
     }
+    public static Response getEmptyResponse(String msg) {
+        return new Response(HttpStatus.BAD_REQUEST,ResponseConstant.OK, msg);
+    }
+    public static Response getInvaildResponse(String msg) {
+        return new Response(HttpStatus.BAD_REQUEST,ResponseConstant.OK, msg);
+    }
+
 
 
     public static Response getOhkResponse(){
@@ -62,5 +70,12 @@ public class Response {
     }
     public static Response getOtpResponses(){
         return new Response(HttpStatus.OK, ResponseConstant.OK, ResponseConstant.Otp_Matched);
+    }
+    public static Response logOutResponse(){
+        return new Response(HttpStatus.OK, ResponseConstant.OK, ResponseConstant.Successfully_Logout);
+    }
+
+    public Response getResponse(HttpStatus httpStatus,Object constant,Object constant1){
+        return new Response(httpStatus, constant.toString(),constant1.toString());
     }
 }

@@ -68,6 +68,7 @@ public class JwtTokenUtil {
         log.info("Secret Key  :"+secret);
         Map<String,Object> header = new HashMap<>();
         header.put("typ","JWT");
+        System.out.println("header"+header);
         return Jwts.builder()
                 .setHeader(header)
                 .setClaims(claims)
@@ -76,7 +77,6 @@ public class JwtTokenUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
                 .signWith(SignatureAlgorithm.HS512,Utils.encodeBase64(secret)).compact();
     }
-
     //validate token
     public Boolean validateToken(String token, JWTUser userDetails) {
         final String userId = getUserIdFromToken(token);

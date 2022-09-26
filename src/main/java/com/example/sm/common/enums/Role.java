@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 @NoArgsConstructor
 @Getter
-public enum Role {
+public enum Role  {
 
     STUDENT("Student"),
     DEPARTMENT("Department"),
@@ -17,5 +17,6 @@ public enum Role {
     Role(String value){
         this.value= value;
     }
+
 
 }

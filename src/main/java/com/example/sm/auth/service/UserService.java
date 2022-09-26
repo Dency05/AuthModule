@@ -1,15 +1,19 @@
 package com.example.sm.auth.service;
 
-import com.amazonaws.services.dynamodbv2.xspec.S;
+import com.example.sm.auth.decorator.*;
+import com.example.sm.auth.enums.UserStatus;
 import com.example.sm.common.decorator.FilterSortRequest;
-import com.example.sm.auth.decorator.UserAddRequest;
-import com.example.sm.auth.decorator.UserFilter;
-import com.example.sm.auth.decorator.UserResponse;
+import com.example.sm.common.decorator.UserImportResponse;
+import com.example.sm.common.decorator.UserImportVerifyRequest;
 import com.example.sm.common.enums.Role;
 import com.example.sm.auth.enums.UserSortBy;
+import com.example.sm.common.model.UserDataModel;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
@@ -23,10 +27,10 @@ public interface UserService {
 
  UserResponse getUser(String id) throws InvocationTargetException, IllegalAccessException;
 
- //TODO PROVIDE void as method type
+
  void deleteUser(String id);
 
- Page<UserResponse> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination);
+ List<UserResponse> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException;
 
  UserResponse getToken(String id) throws InvocationTargetException, IllegalAccessException;
 
@@ -47,4 +51,56 @@ void forgotPassword(String email);
 void setPassword(String password, String confirmPassword,String id);
 
 void otpVerifications(String otp, String id) throws InvocationTargetException, IllegalAccessException;
+
+ void changePassword(String password, String confirmPassword, String newPassword,String id) throws NoSuchAlgorithmException;
+
+ void logOut(String id);
+
+ List<UserResponse> getUserByRole(UserFilter userFilter);
+
+ UserResponse resultDetail(Result result,String id) throws InvocationTargetException, IllegalAccessException;
+
+ List<UserDetailResponse> getUserResult(UserDetail userDetail) throws InvocationTargetException, IllegalAccessException;
+
+ List<UserResultResponse> getUserResultBySemester(UserResult userResult);
+
+ List<UserMinMaxMarkSemResponse> getUserResultByMinMaxSem(UserIdsRequest userIdsRequest);
+
+ void deleteUserResult(String id, int semester);
+
+ List<UserResultByDateRespose> getUserResultByDate(UserResultByDate userResultByDate);
+
+ UserResponse updateUserResult(String id, int semester,Resultupdate result) throws InvocationTargetException, IllegalAccessException;
+
+ List<UserResultByStatus> getUserResultByStatus(UserIdsRequest userIdsRequest);
+
+ Page<UserResultByStatus> getUserResultStatusByPagination(UserIdsRequest userIdsRequest, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException;
+
+Workbook getUserByExcel(UserFilter userFilter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException;
+
+void resultDetailByEmail(String id) throws InvocationTargetException, IllegalAccessException;
+
+void userUpdate(String id, Role role, UserAddRequest userAddRequest) throws InvocationTargetException, IllegalAccessException;
+
+ void userDelete(String id, Role role) throws InvocationTargetException, IllegalAccessException;
+
+String uploadFile(MultipartFile uploadfile) throws IOException;
+
+ UserImportResponse importUsers(MultipartFile file, String id) throws IOException, InvocationTargetException, IllegalAccessException;
+
+ List<UserDataModel> importUsersVerify(UserImportVerifyRequest verifyRequest);
+
+List<UserResponse> importDataInUser(UserIdsRequest userIdsRequest) throws InvocationTargetException, IllegalAccessException;
+
+ void deleteUserInXls(String id);
+
+ void getUserPassword(String userName, String password, String confirmPassword) throws InvocationTargetException, IllegalAccessException;
+
+ void sendMailToInvitedUser(UserStatus userStatus) throws InvocationTargetException, IllegalAccessException;
+
+ void checkUserPublisherId(String id);
+
+ void getPublishedMessage();
+
+ String sendMessage(String id);
 }
