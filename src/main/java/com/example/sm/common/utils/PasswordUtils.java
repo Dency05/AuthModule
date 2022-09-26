@@ -5,12 +5,14 @@ import org.mindrot.jbcrypt.BCrypt;
 import org.passay.CharacterRule;
 import org.passay.EnglishCharacterData;
 import org.passay.PasswordGenerator;
+import org.springframework.stereotype.Component;
+
 import javax.xml.bind.DatatypeConverter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
-
+@Component
 public class PasswordUtils {
 
 
