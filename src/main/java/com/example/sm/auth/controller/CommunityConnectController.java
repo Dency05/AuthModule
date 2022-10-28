@@ -1,9 +1,12 @@
 package com.example.sm.auth.controller;
 
+import com.example.sm.auth.decorator.MonthTitleName;
 import com.example.sm.cc.decorator.*;
 import com.example.sm.cc.enums.MembershipPlan;
 import com.example.sm.cc.enums.PaymentOption;
+import com.example.sm.cc.model.CCUser;
 import com.example.sm.cc.model.ChapterName;
+import com.example.sm.cc.model.Membership_Logs;
 import com.example.sm.cc.service.CCService;
 import com.example.sm.common.decorator.DataResponse;
 import com.example.sm.common.decorator.ListResponse;
@@ -93,6 +96,39 @@ public class CommunityConnectController {
         dataResponse.setStatus(Response.getOkResponse());
         return dataResponse;
     }
+    @SneakyThrows
+    @RequestMapping(name = "addOrUpdateUser", value = "/addUser", method = RequestMethod.POST)
+    public DataResponse<CCUser> addOrUpdateUser (@RequestParam(required = false) String id, @RequestBody CCUserAddRequest ccUserAddRequest) {
+        DataResponse<CCUser> dataResponse = new DataResponse<>();
+        dataResponse.setData(ccService.addOrUpdateUser(id,ccUserAddRequest));
+        dataResponse.setStatus(Response.getOkResponse());
+        return dataResponse;
+    }
 
+    @SneakyThrows
+    @RequestMapping(name = "addMembershipLogs", value = "/add/membership/logs", method = RequestMethod.POST)
+    public DataResponse<Membership_Logs> addMembershipLogs (@RequestBody Membership_LogsAddRequest membership_logsAddRequest) {
+        DataResponse<Membership_Logs> dataResponse = new DataResponse<>();
+        dataResponse.setData(ccService.addMembershipLogs(membership_logsAddRequest));
+        dataResponse.setStatus(Response.getOkResponse());
+        return dataResponse;
+    }
 
+    @SneakyThrows
+    @RequestMapping(name="saveUser",value = "save/user",method=RequestMethod.GET)
+    public DataResponse<CCUser> saveUser (@RequestParam String id) {
+        DataResponse<CCUser> dataResponse = new DataResponse<>();
+        dataResponse.setData(ccService.saveUser(id));
+        dataResponse.setStatus(Response.getOkResponse());
+        return dataResponse;
+    }
+
+    @SneakyThrows
+    @RequestMapping(name = "getMembershipPlans", value = "get/membershipPlans", method = RequestMethod.GET)
+    public DataResponse<MembershipName> getMembershipPlans() {
+        DataResponse<MembershipName> dataResponse = new DataResponse<>();
+        dataResponse.setData(ccService.getMembershipPlans());
+        dataResponse.setStatus(Response.getOkResponse());
+        return dataResponse;
+    }
 }

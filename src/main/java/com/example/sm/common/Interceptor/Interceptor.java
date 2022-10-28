@@ -62,7 +62,7 @@ public class Interceptor extends HandlerInterceptorAdapter implements  HandlerIn
         /*logger.info("PathInfo : {} ",request.getPathInfo());
         logger.info("PathInfo : {} ",request.getPathTranslated());
         logger.info("PathInfo : {} ",request.getServletPath());
-        logger.info("Headers : {} ",Collections.list(request.getHeaderNames()).stream().map(header-> header+":"+request.getHeader(header)+"\n").collect(Collectors.toList()));
+        logger.info("Headers : {} ",Collections.list(request.getHeaderNames()).stream().map(header-> header+":"+request.getHeader(header)+"\n").collect(Collectors.toSet()));
         logger.info("Get Context Path : {} ",request.getContextPath());*/
         // If This is Resource Request then always return true
         if (handler instanceof HttpRequestHandler) {
@@ -77,7 +77,7 @@ public class Interceptor extends HandlerInterceptorAdapter implements  HandlerIn
         RequestMapping rm = method.getMethodAnnotation(RequestMapping.class);
         String jwtToken = request.getHeader(CustomHTTPHeaders.TOKEN.toString());
         // IF ANONYMOUS Role then Pass the role
-        if (restAPIService.hasAccess(Collections.singletonList(Role.ADMIN.toString()),method.getMethod().getName())) {
+        if (restAPIService.hasAccess(Collections.singletonList(Role.ANONYMOUS.toString()),method.getMethod().getName())) {
             try {
                 if (jwtToken != null) {
                     JWTUser user = tokenUtil.getJwtUserFromToken(jwtToken);
@@ -89,6 +89,8 @@ public class Interceptor extends HandlerInterceptorAdapter implements  HandlerIn
             }
             return checkTokenIsExpired(jwtToken, response);
         }
+
+
         if (jwtToken == null) {
             log.error("Authentication not present in the request");
             Response errorResponse = response1.getResponse(HttpStatus.UNAUTHORIZED,
@@ -102,7 +104,7 @@ public class Interceptor extends HandlerInterceptorAdapter implements  HandlerIn
         try {
             user = tokenUtil.getJwtUserFromToken(jwtToken);
             log.info("user"+user);
-            if (restAPIService.hasAccess(user.getRole(),method.getMethod().getName())) {
+            if (!restAPIService.hasAccess(user.getRole(),(method.getMethod().getName()))) {
                 log.error("Role is not allowed");
                 Response errorResponse = response1.getResponse(HttpStatus.FORBIDDEN,
                         MessageConstant.ROLE_NOT_ALLOWED, MessageConstant.ROLE_NOT_ALLOWED);
@@ -110,7 +112,8 @@ public class Interceptor extends HandlerInterceptorAdapter implements  HandlerIn
                 sendJSONResponse(errorResponse, response, HttpServletResponse.SC_FORBIDDEN);
                 return false;
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             log.error("Invalid Token Signature!! ");
             Response errorResponse = response1.getResponse(HttpStatus.UNAUTHORIZED,
                     MessageConstant.INVALID_TOKEN_SIGNATURE, MessageConstant.INVALID_TOKEN_SIGNATURE);

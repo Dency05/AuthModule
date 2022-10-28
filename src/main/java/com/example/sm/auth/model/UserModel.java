@@ -6,7 +6,9 @@ import com.example.sm.common.enums.Role;
 import com.example.sm.common.model.JWTUser;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import jdk.jshell.Snippet;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
@@ -24,6 +26,7 @@ import java.util.Set;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 public class UserModel {
     @Id
     String id;

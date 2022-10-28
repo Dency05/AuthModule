@@ -28,6 +28,7 @@ public class PasswordUtils {
         // previously been hashed
         // If Password bi s null
         if (passwordInDatabase == null) {
+            System.out.println("database password null");
             return false;
         }
 

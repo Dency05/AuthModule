@@ -14,14 +14,20 @@ import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+import javax.activation.DataHandler;
+import javax.activation.DataSource;
+import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeBodyPart;
 import javax.mail.internet.MimeMessage;
+import javax.mail.internet.MimeMultipart;
 import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -36,6 +42,8 @@ public class Utils {
     @Autowired
     MessageSource messageSource;
 
+    @Autowired
+    private JavaMailSender mailSender;
     @Autowired
     AdminConfigurationService configurationService;
     @Autowired
@@ -61,7 +69,7 @@ public class Utils {
     public static String encodeBase64(String password) {
         byte[] pass = Base64.encodeBase64(password.getBytes());
         String actualString = new String(pass);
-        System.out.println(actualString);
+        log.info("actual string:{}",actualString);
         return actualString;
     }
     public static String decodeBase64(String password) {
@@ -88,10 +96,6 @@ public class Utils {
 
     public void sendEmailNow( EmailModel emailModel) {
         try {
-            //SMTP Simple mail transfer protocol
-            /*if(configuration==null){
-                configuration = configService.getConfiguration();
-            }*/
 
             if(StringUtils.isEmpty(emailModel.getSubject())){
                 emailModel.setSubject(emailModel.getSubject());
@@ -100,68 +104,82 @@ public class Utils {
             // Recipient's email ID needs to be mentioned.
             // Sender's email ID needs to be mentioned
             AdminConfiguration adminConfiguration= configurationService.getConfiguration();
-            String from = adminConfiguration.getFrom();
-
-
-           /* String from ="developer@techroversolutions.com" ;
-
-            String username = "developer@techroversolutions.com";// change accordingly //
-            String password = "Ancubate@2019";// change accordingly //*/
             Properties props = new Properties();
             props.put("mail.smtp.auth", adminConfiguration.isSmptAuth());//true
             props.put("mail.smtp.starttls.enable", adminConfiguration.isStarttls());//true
-            //props.put("mail.smtp.ssl.enable", "true");
             props.put("mail.smtp.host", adminConfiguration.getHost());//smtp.office365.com
             props.put("mail.smtp.port", adminConfiguration.getPort());//587
-            /*props.put("mail.smtp.socketFactory.class", "javax.net.ssl.SSLSocketFactory");
-            props.put("mail.smtp.ssl.protocols","TLSv1.2");
-            props.put("mail.smtp.socketFactory.fallback", "false");*/
             // Get the Session object.
+            log.info("getting session object:");
             Session session = Session.getInstance(props, new Authenticator() {
                 protected PasswordAuthentication getPasswordAuthentication() {
                     return new PasswordAuthentication(adminConfiguration.getUsername(), adminConfiguration.getPassword());
                 }
             });
+            log.info("got session object:");
 
             try {
                 // Create a default MimeMessage object.
                 MimeMessage message = new MimeMessage(session);
+                log.info("helper object initialization");
                 MimeMessageHelper helper = new MimeMessageHelper(message, "utf-8");
                 // Set From: header field of the header.
                 helper.setFrom(new InternetAddress(adminConfiguration.getFrom()));
+                log.info("helper from set");
                 // Set To: header field of the header.
                 helper.setTo(emailModel.getTo());
-
+                log.info("helper to  set");
                 if(emailModel.getCc() != null && emailModel.getCc().size() != 0){
                     String[] cc = new String[emailModel.getCc().size()];
                     emailModel.getCc().toArray(cc);
                     helper.setCc(cc);
                 }
-                if(emailModel.getBcc() != null && emailModel.getBcc().size() != 0){
+              /*  if(emailModel.getBcc() != null && emailModel.getBcc().size() != 0){
                     String[] bcc = new String[emailModel.getBcc().size()];
                     emailModel.getBcc().toArray(bcc);
                     helper.setBcc(bcc);
-                }
+                }*/
 
 
                 // Set Subject: header field
                 helper.setSubject(emailModel.getSubject());
+                log.info("helper set subject ");
+
                 // Now set the actual message
-                helper.setText(emailModel.getMessage(),true);
-              /*  if(emailModel.getAttachmentList() != null && emailModel.getAttachmentList().size() != 0){
+              if(emailModel.getFile()!=null) {
+                  DataSource source = new FileDataSource(emailModel.getFile().getName());
+                  Multipart multipart = new MimeMultipart();
+                  MimeBodyPart messageBodyPart = new MimeBodyPart();
+                  MimeBodyPart messageBodyPart1 = new MimeBodyPart();
+                  messageBodyPart.setDataHandler(new DataHandler(source));
+                  messageBodyPart.setFileName(emailModel.getFile().getName());
+                  multipart.addBodyPart(messageBodyPart);
+                  message.setContent(multipart);
+                 /* FileSystemResource fileSystemResource= new FileSystemResource("C:\\excelFiles\\"+emailModel.getFile().getName());
+                  helper.addAttachment(Objects.requireNonNull(fileSystemResource.getFilename()),fileSystemResource);*/
+                  log.info("helper set attachment");
+              }
+
+                /*log.info("email model attachment list size:{}",emailModel.getAttachmentList().size());
+                log.info("email model attachment list size:{}",emailModel.getAttachmentList().toString());
+                if(emailModel.getAttachmentList() != null && emailModel.getAttachmentList().size() != 0){
                     emailModel.getAttachmentList().forEach(attachment->{
                         try {
                             helper.addAttachment(attachment.getFileName(), new URLDataSource(new URL(attachment.getAttachmentUrl())));
+                            log.info("helper set attachment");
                         } catch (MessagingException | IOException e) {
                             log.info("Unable to attach File");
                             e.printStackTrace();
                         }
                     });
-                }
-*/
+                }*/
+
+
+
                 // Send message
                 new Thread(() ->{
                     try {
+                        log.info("email send start...");
                         Transport.send(message);
                         log.info("email send ended");
                     } catch (MessagingException e) {
@@ -213,6 +231,7 @@ public class Utils {
         }
         log.info(stringBuilder.toString());
         generateCommonFooter(stringBuilder);
+        System.out.println("string builder"+stringBuilder.toString());
         return stringBuilder.toString();
     }
 

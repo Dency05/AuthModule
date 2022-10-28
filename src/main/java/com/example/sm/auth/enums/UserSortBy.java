@@ -14,6 +14,8 @@ public enum UserSortBy {
     AGE("age"),
     FIRST_NAME("firstName"),
     LAST_NAME("lastName"),
+    EMAIL("email"),
+
     MIDDLE_NAME("middleName");
 
     @JsonIgnore

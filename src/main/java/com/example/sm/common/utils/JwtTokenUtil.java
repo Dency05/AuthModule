@@ -17,7 +17,7 @@ import java.util.function.Function;
 public class JwtTokenUtil {
 
     /*@Value("${jwt.secret}")*/
-    private final String secret = "dev_test_secret";
+    private final String secret = "dev_generation_jwt_token_users_with_id_role";
 
     /*@Value("${jwt.validity}")*/
     private final String validity= "86400";
@@ -63,19 +63,19 @@ public class JwtTokenUtil {
 //   compaction of the JWT to a URL-safe string
 
     private String doGenerateToken(Map<String, Object> claims, String subject) {
-        System.out.println("Validity :"+ validity);
+        log.info("Validity :{}", validity);
         long JWT_TOKEN_VALIDITY = Long.parseLong(validity);
         log.info("Secret Key  :"+secret);
         Map<String,Object> header = new HashMap<>();
         header.put("typ","JWT");
-        System.out.println("header"+header);
+        log.info("header :{}", header);
         return Jwts.builder()
                 .setHeader(header)
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
-                .signWith(SignatureAlgorithm.HS512,Utils.encodeBase64(secret)).compact();
+                .signWith(SignatureAlgorithm.HS256,Utils.encodeBase64(secret)).compact();
     }
     //validate token
     public Boolean validateToken(String token, JWTUser userDetails) {

@@ -47,4 +47,8 @@ public class MessageConstant {
     public static final String RECORD_SIZE_EXCEED = "Your Record size is larger than 100 please provide valid record size" ;
     public static final String NO_RECORD_FOUND ="No Record Found" ;
     public static final String INVAILD_PAYMENT_OPTION ="Invaild Payment Option" ;
+    public static final String BOOK_ID_NOT_FOUND ="Book id not found" ;
+    public static final String STUDENT_NOT_FOUND ="Student not found" ;
+    public static final String BOOK_NOT_FOUND = "Book not found..please select another book";
+    public static final String BALANCE_NOT_AVAILABLE = "No more balance available";
 }

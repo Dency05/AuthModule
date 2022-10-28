@@ -43,7 +43,8 @@ public class AdminConfiguration{
     NotificationConfiguration notificationConfiguration;
     Map<String,String> userImportMappingFields = new LinkedHashMap<>();
 
-
+   Map<Integer,String> membershipTitle= new LinkedHashMap<>();
+   Map<String,String > monthTitles= new LinkedHashMap<>();
 
     private Set<String> getRequiredItems() {
         Set<String> requiredEmailItems = new HashSet<>();
@@ -66,9 +67,9 @@ public class AdminConfiguration{
     }
 
     public AdminConfiguration(){
-        this.from = "developer@techroversolutions.com";
-        this.username = "developer@techroversolutions.com";
-        this.password = "Techrover@2022";
+        this.from = "dency.g@techroversolutions.com";
+        this.username = "dency.g@techroversolutions.com";
+        this.password = "Rakshit@05";
         this.host = "smtp.office365.com";
         this.port="587";
         this.smptAuth = true;
@@ -93,5 +94,24 @@ public class AdminConfiguration{
         userImportMappingFields.put("Email","email");
         userImportMappingFields.put("UserName","userName");
         userImportMappingFields.put("MobileNo","mobileNo");
+
+        membershipTitle.put(1,"LIFETIME");
+        membershipTitle.put(2,"TWELVE_YEAR");
+        membershipTitle.put(3,"SIX_YEAR");
+        membershipTitle.put(4,"TWO_MONTH");
+
+        monthTitles.put("Jan","01");
+        monthTitles.put("feb","02");
+        monthTitles.put("mar","03");
+        monthTitles.put("apr","04");
+        monthTitles.put("may","05");
+        monthTitles.put("jun","06");
+        monthTitles.put("jul","07");
+        monthTitles.put("aug","08");
+        monthTitles.put("sep","09");
+        monthTitles.put("oct","10");
+        monthTitles.put("nov","11");
+        monthTitles.put("dec","12");
+
     }
 }

@@ -23,6 +23,7 @@ public enum PasswordEncryptionType {
         Map<String, String> map = new HashMap<>();
         map.put("name", name);
         map.put("value", this.toString());
+        System.out.println("map:"+map);
         return map;
     }
 }
