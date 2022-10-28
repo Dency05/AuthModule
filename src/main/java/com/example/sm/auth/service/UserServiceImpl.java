@@ -25,10 +25,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.json.JSONException;
 import org.modelmapper.ModelMapper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -50,44 +51,48 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class UserServiceImpl implements  UserService {
+    private final UserRepository userRepository;
+    private final ImportedDataRepository importedDataRepository;
 
-    @Autowired
-    UserRepository userRepository;
+    private final UserDataRepository userDataRepository;
 
-    @Autowired
-    ImportedDataRepository importedDataRepository;
+    private final NullAwareBeanUtilsBean nullAwareBeanUtilsBean;
 
-    @Autowired
-    UserDataRepository userDataRepository;
+    private final JwtTokenUtil jwtTokenUtil;
+    private final PasswordUtils passwordUtils;
+    private final AdminConfigurationService adminService;
+    private  final  Utils utils;
 
-    @Autowired
-    NullAwareBeanUtilsBean nullAwareBeanUtilsBean;
+    private final NotificationParser notificationParser;
 
-    @Autowired
-    JwtTokenUtil jwtTokenUtil;
+    private final UserPublisher userPublisher;
+    private final ModelMapper modelMapper;
+    private final RequestSession requestSession;
+    public UserServiceImpl(UserRepository userRepository, ImportedDataRepository importedDataRepository, UserDataRepository userDataRepository, NullAwareBeanUtilsBean nullAwareBeanUtilsBean, JwtTokenUtil jwtTokenUtil, PasswordUtils passwordUtils, AdminConfigurationService adminService, Utils utils, NotificationParser notificationParser, UserPublisher userPublisher, ModelMapper modelMapper, RequestSession requestSession) {
+        this.userRepository = userRepository;
+        this.importedDataRepository = importedDataRepository;
+        this.userDataRepository = userDataRepository;
+        this.nullAwareBeanUtilsBean = nullAwareBeanUtilsBean;
+        this.jwtTokenUtil = jwtTokenUtil;
+        this.passwordUtils = passwordUtils;
+        this.adminService = adminService;
+        this.utils = utils;
+        this.notificationParser = notificationParser;
+        this.userPublisher = userPublisher;
+        this.modelMapper = modelMapper;
+        this.requestSession = requestSession;
+    }
 
-    @Autowired
-    PasswordUtils passwordUtils;
-
-    @Autowired
-    ExcelUtil excelUtil;
-
-    @Autowired
-    AdminConfigurationService adminService;
-
-    @Autowired
-    Utils utils;
-
-    @Autowired
-    NotificationParser notificationParser;
-
-    @Autowired
-    UserPublisher userPublisher;
-    @Autowired
-    ModelMapper modelMapper;
-    @Autowired
-    RequestSession requestSession;
-
+    //1.update
+    //pass id, check  if id not null then perform update else add perform
+    //check (user entered  id and database id) matched--> setvariable --> save --> copy -->return userResponse
+    //2.add
+    //pass role
+    //copy properties userAddRequest to userModel
+    //set role in database
+    //save in database
+    //copy properties userModel to userResponse
+    //return userResponse
 
     @Override
     public UserResponse addOrUpdateUser(UserAddRequest userAddRequest, String id, Role role) throws InvocationTargetException, IllegalAccessException {
@@ -96,45 +101,19 @@ public class UserServiceImpl implements  UserService {
             nullAwareBeanUtilsBean.copyProperties(userResponse1, userAddRequest);
             userRepository.save(userResponse1);
             UserResponse userResponse = modelMapper.map(userResponse1,UserResponse.class);
-
-           /* userResponse1.setAddress(userAddRequest.getAddress());
-            userResponse1.setUserName(userAddRequest.getUserName());
-            userResponse1.setPassword(userAddRequest.getPassword());
-            userResponse1.setFirstName(userAddRequest.getFirstName());
-            userResponse1.setMiddleName(userAddRequest.getMiddleName());
-            userResponse1.setLastName(userAddRequest.getLastName());
-            userResponse1.setEmail(userAddRequest.getEmail());*/
             return userResponse;
         } else {
             if (role == null)//check user role
                 throw new InvaildRequestException(MessageConstant.ROLE_NOT_FOUND);
         }
-        checkUserDetails(userAddRequest);//chcek empty or not
-
-
-        //convert birthdate type date to localdate
-        Date date = userAddRequest.getBirthDate();
-        LocalDateTime dates = Instant.ofEpochMilli(date.getTime())
-                .atZone(ZoneId.systemDefault())
-                .toLocalDateTime();
-        System.out.println(dates);
-        LocalDate curDate = LocalDate.now();
-        System.out.println(curDate);
-
-        //set age from birthdate
-        UserModel userModel = new UserModel();
-        if (userAddRequest.getBirthDate() != null) {
-            int age = Period.between(LocalDate.from(dates), curDate).getYears();
-            userModel.setAge(age);
-            System.out.println(age);
-            userRepository.save(userModel);
-        }
-
+        checkUserDetails(userAddRequest);//check empty or not
+        setAgeFromBirthdate(userAddRequest);//set Age from Birthdate
+        UserModel userModel= new UserModel();
         nullAwareBeanUtilsBean.copyProperties(userModel, userAddRequest);
         userModel.setRole(role);//set role in database
         userModel.setFullName();//set fullName
         userModel.setCreatedBy(requestSession.getJwtUser().getId());
-        System.out.println(userModel.getFullName());
+        userModel.setPassword(passwordUtils.encryptPassword(userAddRequest.getPassword()));
         userRepository.save(userModel);
         UserResponse userResponse = new UserResponse();
         nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
@@ -143,7 +122,9 @@ public class UserServiceImpl implements  UserService {
 
     @Override
     public List<UserResponse> getAllUser() throws InvocationTargetException, IllegalAccessException {
+        System.out.println("inside con");
         List<UserModel> userModels = userRepository.findAllBySoftDeleteFalse();
+        System.out.println("userModels:"+userModels);
         List<UserResponse> userResponses = new ArrayList<>();
         if (!CollectionUtils.isEmpty(userModels)) {
             for (UserModel userModel : userModels) {
@@ -156,14 +137,12 @@ public class UserServiceImpl implements  UserService {
     }
 
     @Override
-    public UserResponse getUser(String id) throws InvocationTargetException, IllegalAccessException {
-        UserModel userModel = getUserModel(id);
-        userPublisher.publishToQueue(id);
-        UserResponse userResponse = new UserResponse();
+    public List<UserResponse> getUsers(Set<String> ids) throws InvocationTargetException, IllegalAccessException {
+        List<UserModel> userModel= userRepository.findByIdInAndSoftDeleteIsFalse(ids);
+        log.info("userModel:{}",userModel);
+        //userPublisher.publishToQueue(id);
+        List<UserResponse> userResponse = new ArrayList<>();
         nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
-
-        //data
-        //consumer
         return userResponse;
     }
 
@@ -175,50 +154,75 @@ public class UserServiceImpl implements  UserService {
     }
 
     @Override
-    public List<UserResponse> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest
+    public Page<UserModel> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest
             <UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException {
         return userRepository.findAllUserByFilterAndSortAndPage(filter, sort, pagination);
     }
 
+
+    //1.pass id
+    //2.check user entered id and database id and softDeleteFalse --> matched -->set role
+    //JWT token generate
+    //response token.
     @Override
     public UserResponse getToken(String id) throws InvocationTargetException, IllegalAccessException {
         UserModel userModel = getUserModel(id);
         UserResponse userResponse = new UserResponse();
         userResponse.setRole(userModel.getRole());
         JWTUser jwtUser = new JWTUser(id, Collections.singletonList(userResponse.getRole().toString()));
+        log.info("JWTUser :{}",jwtUser);
         String token = jwtTokenUtil.generateToken(jwtUser);
+        log.info("token :{}",token);
         nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
         userResponse.setToken(token);
         return userResponse;
     }
 
+    //id
+    //username n password
+    //check password is empty or not
+    //if not empty then encrypt (passwordUtils)
+    //if empty hen though error
+    //if password is found then store the encrypted password to the provided ID's user.
+    //save to database
     @Override
     public String getEncryptPassword(String id) throws InvocationTargetException, IllegalAccessException {
         UserModel userModel = getUserModel(id);
         UserResponse userResponse = new UserResponse();
         userResponse.setUserName(userModel.getUserName());
         userResponse.setPassword(userModel.getPassword());
+        System.out.println("password:"+userModel.getPassword());
         if (userModel.getPassword() != null) {
             String password = passwordUtils.encryptPassword(userModel.getPassword());
+            System.out.println(password);
             userModel.setPassword(password);
-            userResponse.setPassword(password);
             userRepository.save(userModel);
-            String passwords = userResponse.getPassword();
-            nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
+            String passwords = userModel.getPassword();
             return passwords;
         } else {
             throw new NotFoundException(MessageConstant.PASSWORD_EMPTY);
         }
     }
 
+    //check password is valid or not.
+    //STEPS
+    //1. pass email,password
+    //2. check email is vaild or not
+    //3. get password from database
+    //4. PasswordUtils is PasswordAuthenticated method call
+    //5. if true (Provide User Details)
+    // else Error -> Password not matched
     @Override
     public UserResponse checkUserAuthentication(String email, String password) throws NoSuchAlgorithmException, InvocationTargetException, IllegalAccessException {
         UserModel userModel = getUserEmail(email);
+        getEncryptPassword(userModel.getId());
+        System.out.println(userModel.getPassword());
         UserResponse userResponse = new UserResponse();
         userResponse.setPassword(userModel.getPassword());
         String getPassword = userResponse.getPassword();
-        System.out.println(getPassword);
+        System.out.println("password"+getPassword);
         boolean passwords = passwordUtils.isPasswordAuthenticated(password, getPassword, PasswordEncryptionType.BCRYPT);
+        System.out.println("passwords"+passwords);
         if (passwords) {
             userRepository.save(userModel);
             nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
@@ -228,6 +232,10 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
+    //pass token
+    //getUserIdFromToken() call from jwtTokenUtil
+    //check generate id and database id is matched then show user details
+    //if not matched then error
     @Override
     public String getIdFromToken(String token) {
         String Id = jwtTokenUtil.getUserIdFromToken(token);
@@ -239,14 +247,20 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
+    //pass token
+    //method call getIdFromToken()
+    //getid from getIdFromToken()
+    //Database id set getid
+    //validateToken() method call from jwtTokenUtil
+    //check if true than show userdetails else error show
     @Override
     public UserResponse getValidityOfToken(String token) throws InvocationTargetException, IllegalAccessException {
         UserResponse userResponse = new UserResponse();
-        String validatetoken = getIdFromToken(token);
-        UserModel userResponse1 = getUserModel(validatetoken);
-        userResponse.setId(validatetoken);
-        String tokenid = userResponse.getId();
-        JWTUser jwtUser = new JWTUser(tokenid, new ArrayList<>());
+        String validateToken = getIdFromToken(token);
+        UserModel userResponse1 = getUserModel(validateToken);
+        userResponse.setId(validateToken);
+        String tokenId = userResponse.getId();
+        JWTUser jwtUser = new JWTUser(tokenId, new ArrayList<>());
         boolean getValidate = jwtTokenUtil.validateToken(token, jwtUser);
         System.out.println(getValidate);
         if (getValidate) {
@@ -257,31 +271,45 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
+    //pass email, password
+    //check username n password
+    //generate random otp and set into emailmodel
+    //set message and To into emailmodel
+    //call the method sendEmailNow from utils
+    //Otp save in userModel
+
     @Override
-    public void login(String email, String password) throws NoSuchAlgorithmException, InvocationTargetException, IllegalAccessException {
-        UserModel userModel = getUserEmail(email);
-        String userpassword = userModel.getPassword();
+    public String login(String email, String password) throws NoSuchAlgorithmException, InvocationTargetException, IllegalAccessException {
         AdminConfiguration adminConfiguration = adminService.getConfiguration();
-        boolean passwords = passwordUtils.isPasswordAuthenticated(password, userpassword, PasswordEncryptionType.BCRYPT);
+        UserModel userModel = getUserEmail(email);
+        boolean passwords = passwordUtils.isPasswordAuthenticated(password,userModel.getPassword(), PasswordEncryptionType.BCRYPT);
+        System.out.println(passwords);
         if (passwords) {
             EmailModel emailModel = new EmailModel();
             String otp = generateOtp();
             emailModel.setMessage(otp);
             emailModel.setTo(userModel.getEmail());
+            log.info("email:{}",userModel.getEmail());
             emailModel.setCc(adminConfiguration.getTechAdmins());
             emailModel.setSubject("Otp Verification");
             utils.sendEmailNow(emailModel);
             userModel.setOtp(otp);
             userModel.setLogin(true);
             userModel.setUserStatus(UserStatus.ACTIVE);
-            Date date = new Date();
-            userModel.setLogoutTime(date);
             userRepository.save(userModel);
+            JWTUser jwtUser = new JWTUser(userModel.getId(), Collections.singletonList(userModel.getRole().toString()));
+            String token = jwtTokenUtil.generateToken(jwtUser);
+            log.info("token:{}",token);
+            return token;
         } else {
             throw new NotFoundException(MessageConstant.PASSWORD_NOT_MATCHED);
         }
     }
 
+    //pass id,otp
+    //check existsBy(id,otp)
+    //if exists then show all details
+    //else error
     @Override
     public UserResponse getOtp(String otp, String id) throws InvocationTargetException, IllegalAccessException {
         boolean exists = userRepository.existsByIdAndOtpAndSoftDeleteFalse(id, otp);
@@ -311,13 +339,17 @@ public class UserServiceImpl implements  UserService {
         userRepository.save(userModel);
     }
 
-
+    //pass password, confirm password
+    //match password and confirm password is equal or not
+    //if match then call login api
+    //not match then show error
     @Override
     public void setPassword(String password, String confirmPassword, String id) {
         if (password.equals(confirmPassword)) {
             UserModel userModel = getUserModel(id);
-            String passwords = passwordUtils.encryptPassword(confirmPassword);
-            userModel.setPassword(passwords);
+            System.out.println(userModel);
+            System.out.println("confirm password:"+confirmPassword);
+            userModel.setPassword(passwordUtils.encryptPassword(confirmPassword));
             userRepository.save(userModel);
         } else {
             throw new NotFoundException(MessageConstant.PASSWORD_NOT_MATCHED);
@@ -327,11 +359,16 @@ public class UserServiceImpl implements  UserService {
     @Override
     public void otpVerifications(String id, String otp) {
         boolean exists = userRepository.existsByIdAndOtpAndSoftDeleteFalse(id, otp);
+        System.out.println(exists);
         if (!exists) {
             throw new NotFoundException(MessageConstant.INVAILD_OTP);
         }
     }
 
+    //pass password
+    //check to database password
+    //new password , confirm password
+    //match --> set to database  else---> error
     @Override
     public void changePassword(String password, String confirmPassword, String newPassword, String id) throws NoSuchAlgorithmException {
         UserModel userModel = getUserModel(id);
@@ -350,6 +387,9 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
+    //pass id
+    //check to database id
+    //match then set login false
     @Override
     public void logOut(String id) {
         UserModel userModel = getUserModel(id);
@@ -359,16 +399,17 @@ public class UserServiceImpl implements  UserService {
         userRepository.save(userModel);
     }
 
+    //if user pass role as student then
+    //show only student data
     @Override
     public List<UserResponse> getUserByRole(UserFilter userFilter) {
         return userRepository.getUser(userFilter);
     }
-
-
     @Override
     public UserResponse resultDetail(Result result, String id) throws InvocationTargetException, IllegalAccessException {
+        System.out.println(id);
         UserModel userModel = getUserModel(id);
-        if (!userModel.getRole().equals(Role.STUDENT)) {//role is student or not?
+        if (userModel.getRole().equals(Role.STUDENT) && userModel.getRole().equals(Role.ADMIN)) {//role is student or not?
             throw new NotFoundException(MessageConstant.ROLE_NOT_MATCHED);
         }
         checkResultCond(result);   //common condition  check
@@ -404,7 +445,7 @@ public class UserServiceImpl implements  UserService {
         userModel.setCgpi(cgpi);
         userModel.setResults(results);
         userRepository.save(userModel);
-        sendResultEmail(userModel, result);//send email
+        //sendResultEmail(userModel, result);//send email
         UserResponse userResponse = new UserResponse();
         nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
         return userResponse;
@@ -432,6 +473,9 @@ public class UserServiceImpl implements  UserService {
         return userRepository.getUserResult(userDetail);
     }
 
+    //user pass multiple id and semester
+    //match in database, unwind result , and find this result total marks and average // group all of data
+    //find total marks and average to this user
     @Override
     public List<UserResultResponse> getUserResultBySemester(UserResult userResult) {
         return userRepository.getUserResultBySemester(userResult);
@@ -445,15 +489,14 @@ public class UserServiceImpl implements  UserService {
     @Override
     public void deleteUserResult(String id, int semester) {
         UserModel userModel = getUserModel(id);
-        List<Result> results1 = new ArrayList<>();
-        results1 = userModel.getResults();
-        System.out.println("size:" + results1.size());
-        System.out.println("data:" + results1);
+        List<Result> results1 = userModel.getResults();
         if (!CollectionUtils.isEmpty(userModel.getResults())) {//check Result empty or not
             for (Result semesters : results1) {
                 if (semesters.getSemester() == semester) {
                     //check  users entered semester equals to  database semester
+                    System.out.println("inside if con");
                     boolean result = results1.remove(semesters);
+                    System.out.println(result);
                     if (result) {
                         userRepository.save(userModel);
                     }
@@ -463,7 +506,6 @@ public class UserServiceImpl implements  UserService {
         } else {
             throw new NotFoundException(MessageConstant.SEMESTER_NOT_FOUND);
         }
-
     }
 
     @Override
@@ -474,9 +516,7 @@ public class UserServiceImpl implements  UserService {
     @Override
     public UserResponse updateUserResult(String id, int semester, Resultupdate result) throws InvocationTargetException, IllegalAccessException {
         UserModel userModel = getUserModel(id);
-        List<Result> results1 = new ArrayList<>();
-        results1 = userModel.getResults();
-        System.out.println("size:" + results1.size());
+        List<Result> results1 = userModel.getResults();
         UserResponse userResponse = new UserResponse();
         if (!CollectionUtils.isEmpty(userModel.getResults())) {//check Result empty or not
             for (Result semesters : results1) {
@@ -492,15 +532,17 @@ public class UserServiceImpl implements  UserService {
                     nullAwareBeanUtilsBean.copyProperties(userModel, semesters);
                     userRepository.save(userModel);
                     nullAwareBeanUtilsBean.copyProperties(userResponse, userModel);
-
                 }
             }
-            return userResponse;
+               return userResponse;
         } else {
             throw new NotFoundException(MessageConstant.RESULT_EMPTY);
         }
     }
 
+    //pass mutiple id
+    //aggregation operation(branch switch case)
+    //set the user result status like(firstClass, secondClass, fourth,fifth)
     @Override
     public List<UserResultByStatus> getUserResultByStatus(UserIdsRequest userIdsRequest) {
         return userRepository.getUserResultByStatus(userIdsRequest);
@@ -513,9 +555,9 @@ public class UserServiceImpl implements  UserService {
 
     @Override
     public Workbook getUserByExcel(UserFilter userFilter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException {
-        List<UserResponse> userResponses = getAllUserWithFilterAndSort(userFilter, sort, pagination);
+        Page<UserModel> userResponses = getUserWithPagination(userFilter,sort,pagination);
         List<UserResponseExcel> userResponseExcel = new ArrayList<>();
-        for (UserResponse userResponse : userResponses) {//useResponses.for
+        for (UserModel userResponse : userResponses.getContent()) {//useResponses.for
             UserResponseExcel userResponseExcel1 = new UserResponseExcel();
             nullAwareBeanUtilsBean.copyProperties(userResponseExcel1, userResponse);
             userResponseExcel.add(userResponseExcel1);
@@ -523,7 +565,8 @@ public class UserServiceImpl implements  UserService {
             log.info("name" + userResponse.getFirstName());
             log.info("ids" + userResponseExcel1.getId());
         }
-        return ExcelUtil.createWorkbookFromData(userResponseExcel);
+       String title= "student data";
+        return ExcelUtil.createWorkbookFromData(userResponseExcel,title);
     }
 
     @Override
@@ -535,6 +578,11 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
+    //update user detail
+    //admin can all user update
+    //student only update student user
+    //department only update department and student user
+    //send mail to user that which item user is updated
     @Override
     public void userUpdate(String id, Role role, UserAddRequest userAddRequest) throws InvocationTargetException, IllegalAccessException {
         UserModel usermodel = getUserModel(id);
@@ -557,7 +605,8 @@ public class UserServiceImpl implements  UserService {
             }
         }
         if(userUpdate){
-            updateUserDetail(id, userAddRequest);
+            System.out.println("inside if con ");
+            updateUserDetail(id, userAddRequest,usermodel);
             difference(usermodel, userAddRequest,changedProperties);
             emailSend(changedProperties);
         }
@@ -589,14 +638,13 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
-    @Override
-    public String uploadFile(MultipartFile uploadfile) throws IOException {
-        if (uploadfile.isEmpty()) {
+    public String uploadFile(MultipartFile uploadFile) throws IOException {
+        if (uploadFile.isEmpty()) {
             throw new EmptyException(MessageConstant.FILE_IS_EMPTY);
         }
-        saveUploadedFiles(Arrays.asList(uploadfile));
-        log.info( "Successfully uploaded - " + uploadfile.getOriginalFilename());
-        return  "Successfully uploaded - " + uploadfile.getOriginalFilename();
+        saveUploadedFiles(Arrays.asList(uploadFile));
+        log.info( "Successfully uploaded - " + uploadFile.getOriginalFilename());
+        return  "Successfully uploaded - " + uploadFile.getOriginalFilename();
     }
 
     @Override
@@ -615,7 +663,6 @@ public class UserServiceImpl implements  UserService {
                 }
             }
         }
-
         importedData.setImportDate(new Date());
         importedData = importedDataRepository.save(importedData);
         UserImportResponse importResponse = new UserImportResponse();
@@ -625,16 +672,24 @@ public class UserServiceImpl implements  UserService {
         return importResponse;
     }
 
+    //pass FirstName: firstname, as it all header and pass id
+    //check  id in importdataUser
+    //set the value in database
+    //check email is exists or not in imported xlxs data if email is same then throw error
+    //add all data in user_imported_data collection(json formt)
     @Override
     public List<UserDataModel> importUsersVerify(UserImportVerifyRequest verifyRequest) {
         List<UserDataModel> users;
         //check id in database
         UserImportedData data = importedDataRepository.findById(verifyRequest.getId()).orElseThrow(()->new NotFoundException(MessageConstant.NO_RECORD_FOUND));
         //set import date
+        System.out.println("data"+data);
         Date importDate = new Date();
         users = getUserFromImportedData(data,verifyRequest,importDate);
+
 //        if (userDataRepository.findAllByImportedIdAndSoftDeleteIsFalse(verifyRequest.getId()).isEmpty()){
         setAndGetDuplicateEmailUsers(users);
+
         users = userDataRepository.saveAll(users);
         if(!CollectionUtils.isEmpty(users)){
             userDataRepository.saveAll(users);
@@ -732,21 +787,98 @@ public class UserServiceImpl implements  UserService {
     public void checkUserPublisherId(String id) {
 
     }
-
-    @Override
-    public void getPublishedMessage() {
-
-    }
-
     @Override
     public String sendMessage(String id) {
         log.info("ID : {}",id);
         return id;
     }
 
+    @Override
+    public MonthTitleName getUserDetailByMonth(String year) throws JSONException, InvocationTargetException, IllegalAccessException {
+        List<UserDetailByMonth> userDetailByMonths= new ArrayList<>(userRepository.getUserByMonth(year));
+        System.out.println("userDetailByMonths"+userDetailByMonths);
+        MonthTitleName monthTitleNames= new MonthTitleName();
+        double totalCount= 0;
+        Set<String> titles= new LinkedHashSet<>();
+        HashMap<String,String> title= new LinkedHashMap<>();
+        title.put("Jan","1");
+        title.put("feb","2");
+        title.put("mar","3");
+        title.put("apr","4");
+        title.put("may","5");
+        title.put("jun","6");
+        title.put("jul","7");
+        title.put("aug","8");
+        title.put("sep","9");
+        title.put("oct","10");
+        title.put("nov","11");
+        title.put("dec","12");
+
+        for (Map.Entry<String,String> entry : title.entrySet()) {
+            String titleName = entry.getKey() + " - " + year;
+            titles.add(titleName);
+            System.out.println("title"+titles);
+            boolean exist = userDetailByMonths.stream().anyMatch(e -> e.getMonth().equals(entry.getValue()));
+            System.out.println(exist);
+            if(!exist){// check month is null or not if null then set count 0 and set month name
+                System.out.println("inside if con");
+                UserDetailByMonth userDetailByMonth1= new UserDetailByMonth();
+                userDetailByMonth1.setCount(0.0);
+                userDetailByMonth1.setMonth(entry.getValue());
+                userDetailByMonths.add(userDetailByMonth1);
+                System.out.println("userDetailMon"+userDetailByMonths);
+                monthTitleNames.setTitle(titles);
+            }
+        }
+        userDetailByMonths.sort(Comparator.comparing(UserDetailByMonth::getMonth));
+        monthTitleNames.setUserDetailByMonths(userDetailByMonths);
+
+        for (UserDetailByMonth userDetailByMonth : userDetailByMonths) {
+            totalCount= totalCount+userDetailByMonth.getCount();
+            monthTitleNames.setTotalCount(totalCount);
+        }
+        return monthTitleNames;
+    }
+
+    @Override
+    public UserResponse getUser(String id) throws InvocationTargetException, IllegalAccessException {
+        UserModel userModel= getUserModel(id);
+        UserResponse userResponse= new UserResponse();
+        nullAwareBeanUtilsBean.copyProperties(userResponse,userModel);
+        return userResponse;
+    }
+
+    @Override
+    public void getAllUserByPagination() {
+        Pagination pagination= new Pagination();
+        pagination.setLimit(30);
+        FilterSortRequest.SortRequest<UserSortBy> sortBySortRequest= new FilterSortRequest.SortRequest<>();
+        sortBySortRequest.setOrderBy(Sort.Direction.ASC);
+        sortBySortRequest.setSortBy(UserSortBy.EMAIL);
+        Page<UserModel> userModels = null;
+        List<UserModel> userModels1= new ArrayList<>();
+        int i= 0;
+        do{
+            pagination.setPage(i++);
+            PageRequest pageRequest = PageRequest.of(pagination.getPage(), pagination.getLimit());
+            userModels= userRepository.getAllUser(new UserFilter(),sortBySortRequest,pageRequest);
+            System.out.println("userModels"+userModels);
+            userModels1.addAll(userModels.getContent());
+        }
+        while(userModels.hasNext());
+        for (UserModel userModel : userModels1) {
+            userModel.setFullName();
+            userRepository.save(userModel);
+        }
+    }
+
+    @Override
+    public Page<UserModel> getUserWithPagination(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pageRequest) {
+        return userRepository.getAllUser(filter,sort,pageRequest);
+    }
     //common method
     private UserModel getUserModel(String id) {
-        return userRepository.findByIdAndSoftDeleteIsFalse(id).orElseThrow(() -> new NotFoundException(MessageConstant.USER_ID_NOT_FOUND));
+          return userRepository.findByIdAndSoftDeleteIsFalse(id).orElseThrow(() -> new NotFoundException(MessageConstant.USER_ID_NOT_FOUND));
     }
 
     private UserModel getUserName(String userName) {
@@ -811,6 +943,24 @@ public class UserServiceImpl implements  UserService {
             throw new InvaildRequestException(MessageConstant.INVAILD_ZIPCODE);
         }
     }
+    public void setAgeFromBirthdate(UserAddRequest userAddRequest){
+        Date date = userAddRequest.getBirthDate();
+        LocalDateTime dates = Instant.ofEpochMilli(date.getTime())
+                .atZone(ZoneId.systemDefault())
+                .toLocalDateTime();
+        System.out.println(dates);
+        LocalDate curDate = LocalDate.now();
+        System.out.println(curDate);
+
+        //set age from birthdate
+        UserModel userModel = new UserModel();
+        if (userAddRequest.getBirthDate() != null) {
+            int age = Period.between(LocalDate.from(dates), curDate).getYears();
+            userModel.setAge(age);
+            System.out.println(age);
+            userRepository.save(userModel);
+        }
+    }
 
     public void checkResultCond(Result result) throws InvocationTargetException, IllegalAccessException {
         AdminConfiguration adminConfiguration = adminService.getConfiguration();
@@ -840,6 +990,8 @@ public class UserServiceImpl implements  UserService {
             responseByEmail.setSpi(result1.getSpi());
             response.add(responseByEmail);
         }
+
+        System.out.println("respone:"+response);
         try {
             EmailModel emailModel = new EmailModel();
             emailModel.setTo(userModel.getEmail());
@@ -852,8 +1004,7 @@ public class UserServiceImpl implements  UserService {
         }
     }
 
-    public void updateUserDetail(String id, UserAddRequest userAddRequest) throws InvocationTargetException, IllegalAccessException {
-        UserModel userResponse1 = getUserModel(id);
+    public void updateUserDetail(String id, UserAddRequest userAddRequest,UserModel userResponse1) throws InvocationTargetException, IllegalAccessException {
         if (userResponse1 != null) {
             if (userAddRequest.getFirstName() != null) {
                 userResponse1.setFirstName(userAddRequest.getFirstName());
@@ -964,36 +1115,38 @@ public class UserServiceImpl implements  UserService {
         Set<String> duplicateEmails = new HashSet<>();
         if(!CollectionUtils.isEmpty(users)) {  //database empty
             for (UserDataModel user : users) { //
-                log.info("---------------Start--------------------");
-                log.info("Actual Email: {}",user.getEmail());
                 user.setDuplicateEmail(checkDuplicateEmail(user.getEmail()));
-                log.info("Duplicate Email Status: {}",user.isDuplicateEmail());
                 if(!user.isEmptyEmail()){
                     if(!uniqueEmails.contains(user.getEmail().toLowerCase())){
-                        log.info("Unique Email: {}",user.getEmail());
                         uniqueEmails.add(user.getEmail().toLowerCase());
                     }else {
-                        log.info("Duplicate Email: {}",user.getEmail());
                         duplicateEmails.add(user.getEmail().toLowerCase());
                     }
                 }
-                log.info("------------------End-----------------");
             }
             for (UserDataModel user : users) {
-                log.info("------------Start1---------------");
                 if(!user.isEmptyEmail() && !user.isDuplicateEmail()){
-                    log.info("User Email Is Not Duplicate: {}",user.getEmail());
                     user.setDuplicateEmail(duplicateEmails.contains(user.getEmail().toLowerCase()));
-                    log.info("Check Email Status: {}",user.getEmail());
                 }
                 if(user.isDuplicateEmail()){
-                    log.info("Added Duplicate Email In List: {}",user.getEmail());
                     userList.add(user);
                 }
-                log.info("------------End1---------------");
             }
         }
+        System.out.println("userList"+userList);
         return userList;
+    }
+
+    void sendEmailLogInTime(UserModel userModel) throws InvocationTargetException, IllegalAccessException {
+        AdminConfiguration adminConfiguration = adminService.getConfiguration();
+        EmailModel emailModel = new EmailModel();
+        String otp = generateOtp();
+        emailModel.setMessage(otp);
+        emailModel.setTo(userModel.getEmail());
+        log.info("email:{}",userModel.getEmail());
+        emailModel.setCc(adminConfiguration.getTechAdmins());
+        emailModel.setSubject("Otp Verification");
+        utils.sendEmailNow(emailModel);
     }
 
     private boolean checkDuplicateEmail(String email) {

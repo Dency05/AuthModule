@@ -2,6 +2,7 @@ package com.example.sm.auth.service;
 
 import com.example.sm.auth.decorator.*;
 import com.example.sm.auth.enums.UserStatus;
+import com.example.sm.auth.model.UserModel;
 import com.example.sm.common.decorator.FilterSortRequest;
 import com.example.sm.common.decorator.UserImportResponse;
 import com.example.sm.common.decorator.UserImportVerifyRequest;
@@ -9,6 +10,7 @@ import com.example.sm.common.enums.Role;
 import com.example.sm.auth.enums.UserSortBy;
 import com.example.sm.common.model.UserDataModel;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.json.JSONException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.web.multipart.MultipartFile;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Set;
 
 
 public interface UserService {
@@ -25,12 +28,12 @@ public interface UserService {
 
  List<UserResponse> getAllUser() throws InvocationTargetException, IllegalAccessException;
 
- UserResponse getUser(String id) throws InvocationTargetException, IllegalAccessException;
+ List<UserResponse> getUsers(Set<String> ids) throws InvocationTargetException, IllegalAccessException;
 
 
  void deleteUser(String id);
 
- List<UserResponse> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException;
+ Page<UserModel> getAllUserWithFilterAndSort(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pagination) throws InvocationTargetException, IllegalAccessException;
 
  UserResponse getToken(String id) throws InvocationTargetException, IllegalAccessException;
 
@@ -42,7 +45,7 @@ public interface UserService {
 
  UserResponse getValidityOfToken(String token) throws InvocationTargetException, IllegalAccessException;
 
-void login(String email, String password) throws InvocationTargetException, IllegalAccessException, NoSuchAlgorithmException;
+String login(String email, String password) throws InvocationTargetException, IllegalAccessException, NoSuchAlgorithmException;
 
 UserResponse getOtp(String otp,String id) throws InvocationTargetException, IllegalAccessException;
 
@@ -50,7 +53,7 @@ void forgotPassword(String email);
 
 void setPassword(String password, String confirmPassword,String id);
 
-void otpVerifications(String otp, String id) throws InvocationTargetException, IllegalAccessException;
+void otpVerifications(String id, String otp) throws InvocationTargetException, IllegalAccessException;
 
  void changePassword(String password, String confirmPassword, String newPassword,String id) throws NoSuchAlgorithmException;
 
@@ -84,8 +87,6 @@ void userUpdate(String id, Role role, UserAddRequest userAddRequest) throws Invo
 
  void userDelete(String id, Role role) throws InvocationTargetException, IllegalAccessException;
 
-String uploadFile(MultipartFile uploadfile) throws IOException;
-
  UserImportResponse importUsers(MultipartFile file, String id) throws IOException, InvocationTargetException, IllegalAccessException;
 
  List<UserDataModel> importUsersVerify(UserImportVerifyRequest verifyRequest);
@@ -99,8 +100,13 @@ List<UserResponse> importDataInUser(UserIdsRequest userIdsRequest) throws Invoca
  void sendMailToInvitedUser(UserStatus userStatus) throws InvocationTargetException, IllegalAccessException;
 
  void checkUserPublisherId(String id);
-
- void getPublishedMessage();
-
  String sendMessage(String id);
+
+ MonthTitleName getUserDetailByMonth(String year) throws JSONException, InvocationTargetException, IllegalAccessException;
+
+ UserResponse getUser(String id) throws InvocationTargetException, IllegalAccessException;
+
+void getAllUserByPagination() throws JSONException, InvocationTargetException, IllegalAccessException;
+
+ Page<UserModel> getUserWithPagination(UserFilter filter, FilterSortRequest.SortRequest<UserSortBy> sort, PageRequest pageRequest);
 }

@@ -1,4 +1,4 @@
-/*
+
 package com.example.sm.common.config;import com.example.sm.common.Interceptor.Interceptor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -14,6 +14,7 @@ public class InterceptorConfigurer implements WebMvcConfigurer {
 
     @Autowired
     Interceptor interceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(interceptor).excludePathPatterns(
@@ -29,24 +30,20 @@ public class InterceptorConfigurer implements WebMvcConfigurer {
         log.info("Adding Login authentication interceptor");
         WebMvcConfigurer.super.addInterceptors(registry);
     }
-    */
-/**
-     * Add Cross origin mapping at global Scal
-     * @param registry
-     *//*
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**");
-    }
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry
-                .addResourceHandler("swagger-ui.html")
-                .addResourceLocations("classpath:/META-INF/resources/");
-        registry
-                .addResourceHandler("/webjars/**")
-                .addResourceLocations("classpath:/META-INF/resources/webjars/");
-    }
+        @Override
+        public void addCorsMappings (CorsRegistry registry){
+            registry.addMapping("/**");
+        }
+        @Override
+        public void addResourceHandlers (ResourceHandlerRegistry registry){
+            registry
+                    .addResourceHandler("swagger-ui.html")
+                    .addResourceLocations("classpath:/META-INF/resources/");
+            registry
+                    .addResourceHandler("/webjars/**")
+                    .addResourceLocations("classpath:/META-INF/resources/webjars/");
+        }
 }
-*/
+
+

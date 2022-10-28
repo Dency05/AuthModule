@@ -1,6 +1,7 @@
 package com.example.sm.common.listener;
 
 import com.example.sm.auth.controller.AdminConfigurationController;
+import com.example.sm.auth.controller.BookShopController;
 import com.example.sm.auth.controller.UserController;
 import com.example.sm.common.decorator.RestAPI;
 import com.example.sm.common.model.AdminConfiguration;
@@ -67,6 +68,7 @@ public class ApplicationStartUpEventListener {
         // On Application Start up , create the list of authorized services for authorized data
         if(!skip){
             saveIfNotExits(Utils.getAllMethodNames(UserController.class));
+            saveIfNotExits(Utils.getAllMethodNames(BookShopController.class));
             saveIfNotExits(Utils.getAllMethodNames(AdminConfigurationController.class));
         }
 
@@ -84,14 +86,14 @@ public class ApplicationStartUpEventListener {
         /*if (StringUtils.isEmpty(e.getTo())){
             emails.setTo(emails.iterator().next());
         }*/
-        EmailModel emailModel = new EmailModel();
+        /*EmailModel emailModel = new EmailModel();
         AdminConfiguration adminConfiguration= adminConfigurationService.getConfiguration();
         emailModel.setTo(emails.iterator().next());
         emailModel.setCc(adminConfiguration.getTechAdmins());
         //emailModel.setBcc(emailNotificationConfig.getBcc());
         emailModel.setSubject("Auth module started");
         emailModel.setMessage("AuthModule<br/><br/>CST time : "+cstTime+"<br/>GMT time : "+gmtTime+"<br/>IST time : "+istTime);
-        utils.sendEmailNow(emailModel);
+        utils.sendEmailNow(emailModel);*/
         log.info("Module started mail sent to tech-admins");
         //scheduleCronJobs(adminRepository.findAll().get(0));*/
     }
